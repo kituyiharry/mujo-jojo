@@ -1,0 +1,13 @@
+[package]
+name = "mujoco-sys"
+version = "0.1.0"
+edition = "2024"
+
+# only needed for examples
+[dependencies]
+glfw-sys = "6.0.0"
+glow = "0.16.0"
+
+[build-dependencies]
+bindgen = "*"
+regex = {version = "1.11.2"}
