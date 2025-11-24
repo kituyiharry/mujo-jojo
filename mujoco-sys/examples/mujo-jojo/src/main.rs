@@ -1,5 +1,7 @@
-use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
+use mujoco_sys::{self, mjrContext, mjtVisFlag, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
 use glfw_sys::*;
+use std::thread::{sleep, sleep_ms};
+use std::time::Duration;
 use std::{ffi::CStr, ptr};
 use std::ffi::{CString};
 
@@ -317,7 +319,7 @@ fn main() {
         let win = glfwCreateWindow(
             1280,
             720,
-            c"Mujoco Basic".as_ptr(),
+            c"Mujo-Jojo Simulation".as_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         );
@@ -361,36 +363,39 @@ fn main() {
         println!("Created OpenGL context with handle: {:?}\n", ctx);
 
         // Model init
-        let mut drone = drone::Drone::new(MODEL, DATA);
-        let start = std::time::Instant::now().elapsed().as_secs_f64();
-        let mut step = 1; 
+        let mut drone = drone::Drone::new(MODEL, DATA, [0.,0.,2.]);
+        let instant   = std::time::Instant::now();
+        let start     = instant.elapsed().as_secs_f64();
+        let mut step  = 1; 
+        let mut completed = 0;
 
-        // browser will call this closure every frame
-        // Try to never block inside this and always return control flow to browser.
-        //set_main_loop_callback(move || {
-        //'MAINLOOP: loop {
         while glfwWindowShouldClose(win) == 0 {
             // lets animate clear color based on time
-            // let time = glfwGetTime() as f32;
+            // let now = glfwGetTime();
 
-            // advance interactive simulation for 1/60 sec
+            //  advance interactive simulation for 1/60 sec
             //  Assuming MuJoCo can simulate faster than real-time, which it usually can,
             //  this loop will finish on time for the next frame to be rendered at 60 fps.
             //  Otherwise add a cpu timer and exit this loop when it is time to render.
-            let simstart = (*DATA).time;
-            let now      = std::time::Instant::now().elapsed().as_secs_f64(); 
+            //  let simstart = (*DATA).time;
 
-            if (now - start) > 2. {
-                println!("First waypoint");
-                drone.planner.borrow_mut().update_target([1.,1.,1.]);
+            let now  = instant.elapsed().as_secs_f64(); 
+            let diff = now - start;
+
+            if diff > 2. && completed < 1 {
+                //println!("First waypoint");
+                //drone.planner.borrow_mut().update_target([1.,1.,1.]);
+                completed += 1;
             }
-            if (now - start) > 10. {
-                println!("Second waypoint");
-                drone.planner.borrow_mut().update_target([-1.,1.,2.]);
+            if (diff) > 10. && completed < 2 {
+                //println!("Second waypoint");
+                //drone.planner.borrow_mut().update_target([-1.,1.,2.]);
+                completed += 1;
             }
-            if (now - start) > 18. {
-                println!("Second waypoint");
-                drone.planner.borrow_mut().update_target([-1.,-1.,0.5]);
+            if (diff) > 18. && completed < 3 {
+                //println!("Third waypoint");
+                //drone.planner.borrow_mut().update_target([-1.,-1.,0.5]);
+                completed += 1;
             }
 
             if step % 20 == 0 {
@@ -400,17 +405,9 @@ fn main() {
 
             step += 1;
 
-            while ((*DATA).time - simstart) < 1.0/60.0 {
-                //eprintln!("\r-----+");
-                mujoco_sys::mj_step(MODEL, DATA);
-            }
+            mujoco_sys::mj_step(MODEL, DATA);
 
-            //ctx.clear_color(time.sin(), time.cos(), time.tan(), 1.0);
-            //ctx.clear(glow::COLOR_BUFFER_BIT);
-
-            let mut viewport = mujoco_sys::mjrRect_ { 
-                left: 0, bottom: 0, width: 0, height: 0 
-            };
+            let mut viewport = mujoco_sys::mjrRect_ { left: 0, bottom: 0, width: 0, height: 0 };
 
             glfwGetFramebufferSize(win, &mut viewport.width as *mut i32, &mut viewport.height as *mut i32,);
 
@@ -426,11 +423,14 @@ fn main() {
             if glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_TRUE {
                 glfwMakeContextCurrent(std::ptr::null_mut());
                 glfwDestroyWindow(win);
-                //break;
-                //emscripten_cancel_main_loop();
+            }
+
+            let time   = instant.elapsed().as_secs_f64();
+            let t_next = (*MODEL).opt.timestep - (time - now);
+            if t_next > 0. {
+                sleep(Duration::from_secs_f64(t_next));
             }
         }
-        //});
 
         //free visualization storage
         mujoco_sys::mjv_freeScene(SCN);

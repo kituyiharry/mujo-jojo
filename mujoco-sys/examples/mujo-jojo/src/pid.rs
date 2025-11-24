@@ -1,4 +1,3 @@
-#[derive(Debug, Clone)]
 pub struct PID  {
     pub kp: f64,
     pub ki: f64,
@@ -10,22 +9,34 @@ pub struct PID  {
     pub proportional_on_measurement: bool, 
     pub differential_on_measurement: bool,
     pub error_map: fn(f64) -> f64,
-    pub time_fn: fn() -> std::time::Instant,
+    pub time_fn:   Box<dyn Fn() -> f64>,
 
     proportional: f64,
     integral:     f64,
     derivative:   f64,
 
-    last_time:   f64, 
+    last_time:   Option<f64>,
     last_input:  Option<f64>,
     last_output: Option<f64>,
     last_error:  Option<f64>,
 }
 
+fn clamp(v: Option<f64>, min: Option<f64>, max: Option<f64>) -> Option<f64> {
+    if v.is_none() { return v; }
+    let val = v.unwrap();
+    match (min, max) {
+        (None, None) => v,
+        (None, Some(upper)) =>    { if val > upper { Some(upper) } else { v }},
+        (Some(lower), None) =>    { if val < lower { Some(lower) } else { v }},
+        (Some(lower), Some(upper)) => {  Some(f64::clamp(val, lower, upper)) },
+    }
+}
+
 impl PID {
 
     pub fn new(kp: f64, ki: f64, kd: f64, setpoint: f64) -> Self {
-        Self {
+        let instant = std::time::Instant::now();
+        let mut s = Self {
             kp, ki, kd, setpoint,
             sample_time: 0.01,
             outlims: [None, None],
@@ -33,26 +44,53 @@ impl PID {
             proportional_on_measurement: false, 
             differential_on_measurement: true,
             error_map: |n|{ n },
-            time_fn: std::time::Instant::now, 
+            time_fn:   Box::new(move || instant.elapsed().as_secs_f64()), 
 
             proportional: 0.,
             integral:     0.,
             derivative:   0.,
 
-            last_time:    std::time::Instant::now().elapsed().as_secs_f64(),
+            last_time:    None,
             last_input:   None,
             last_output:  None,
             last_error:   None,
-        }
+        };
+        s.reset();
+        s
+    }
+
+    pub fn with_limits(kp: f64, ki: f64, kd: f64, setpoint: f64, sout: f64, limits: [Option<f64>; 2]) -> Self {
+        let instant = std::time::Instant::now();
+        let mut s = Self {
+            kp, ki, kd, setpoint,
+            sample_time: 0.01,
+            outlims: limits,
+            auto: true,
+            proportional_on_measurement: false, 
+            differential_on_measurement: true,
+            error_map: |n|{ n },
+            time_fn:   Box::new(move || instant.elapsed().as_secs_f64()), 
+
+            proportional: 0.,
+            integral:     clamp(Some(sout), limits[0], limits[1]).unwrap(),
+            derivative:   0.,
+
+            last_time:    None,
+            last_input:   None,
+            last_output:  None,
+            last_error:   None,
+        };
+        s.reset();
+        s
     }
 
     pub fn limits(&mut self, min: f64, max: f64)  {
         if max < min {
             panic!("lower limit cannot exceed upper");
         }
-        self.outlims  = [Some(min), Some(max)];
-        self.integral = f64::clamp(self.integral, min, max);
-        self.last_output = Some(f64::clamp(self.last_output.unwrap_or(min), min, max));
+        self.outlims     = [Some(min), Some(max)];
+        self.integral    = clamp(Some(self.integral), Some(min), Some(max)).unwrap();
+        self.last_output = clamp(self.last_output, Some(min), Some(max));
     }
 
     /** 
@@ -78,8 +116,8 @@ impl PID {
     pub fn toggleauto(&mut self, enabled: bool, last_out: Option<f64>) {
         if enabled && !self.auto {
             self.reset();
-            self.last_output = last_out;
-            self.integral = f64::clamp(self.integral, self.outlims[0].unwrap_or(self.integral), self.outlims[1].unwrap_or(self.integral));
+            self.integral = last_out.unwrap_or(0.);
+            self.integral = clamp(Some(self.integral), self.outlims[0], self.outlims[1]).unwrap();
         }
         self.auto = enabled
     }
@@ -94,9 +132,9 @@ impl PID {
         self.integral     = 0.;
         self.derivative   = 0.;
 
-        self.integral = f64::clamp(self.integral, self.outlims[0].unwrap_or(self.integral), self.outlims[1].unwrap_or(self.integral));
+        self.integral = clamp(Some(self.integral), self.outlims[0], self.outlims[1]).unwrap();
 
-        self.last_time = (self.time_fn)().elapsed().as_secs_f64();
+        self.last_time   = Some((self.time_fn)());
         self.last_output = None;
         self.last_input  = None;
         self.last_error  = None
@@ -107,10 +145,16 @@ impl PID {
             return self.last_output
         }
 
-        let now = (self.time_fn)().elapsed().as_secs_f64();
-        let dt = delta.unwrap_or_else(||{
-            let s = now - self.last_time;
-            if s > 0. { s } else { 1e-16 }
+        let now = (self.time_fn)();
+        let dt = delta.unwrap_or({
+            match self.last_time {
+                Some(last) => {
+                    now - last
+                }
+                None => {
+                    1e-16
+                }
+            }
         });
 
         if dt < self.sample_time && self.last_output.is_some() {
@@ -129,15 +173,15 @@ impl PID {
         // Compute the proportional term
         if !self.proportional_on_measurement {
             // Regular proportional-on-error, simply set the proportional term
-            self.proportional = self.kp * error
+            self.proportional =  (self.kp * error);
         } else {
             // Add the proportional error on measurement to error_sum
-            self.proportional -= self.kp * d_input
+            self.proportional -= (self.kp * d_input);
         }
 
         // Compute integral and derivative terms
-        self.integral += self.ki * error * dt;
-        self.integral = f64::clamp(self.integral, self.outlims[0].unwrap_or(self.integral), self.outlims[1].unwrap_or(self.integral));
+        self.integral += (self.ki * error * dt);
+        self.integral = clamp(Some(self.integral), self.outlims[0], self.outlims[1]).unwrap();
 
         if self.differential_on_measurement {
             self.derivative = -self.kd * d_input / dt;
@@ -147,13 +191,13 @@ impl PID {
 
         // Compute final output
         let mut output = self.proportional + self.integral + self.derivative;
-        output = f64::clamp(output, self.outlims[0].unwrap_or(output), self.outlims[1].unwrap_or(output));
+        output = clamp(Some(output), self.outlims[0], self.outlims[1]).unwrap();
 
         // Keep track of state
         self.last_output = Some(output);
         self.last_input  = Some(input);
         self.last_error  = Some(error);
-        self.last_time   = now;
+        self.last_time   = Some(now);
 
         Some(output)
     }

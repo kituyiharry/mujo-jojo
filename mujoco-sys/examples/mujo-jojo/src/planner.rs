@@ -16,10 +16,9 @@ impl Planner {
         if vel < 0. {
             panic!("planner  velocity must be at least 0");
         }
-        let mut pidx = PID::new(2., 0.15, 1.5, target[0]);
-        pidx.limits(-vel, vel);
-        let mut pidy = PID::new(2., 0.15, 1.5, target[1]);
-        pidy.limits(-vel, vel);
+        let pidx = PID::with_limits(2., 0.15, 1.5, target[0], 0., [Some(-vel),Some(vel)]);
+        let pidy = PID::with_limits(2., 0.15, 1.5, target[1], 0., [Some(-vel),Some(vel)]);
+
         Self { 
             target, 
             vel_limit: vel, 
@@ -36,14 +35,14 @@ impl Planner {
     }
 
     pub fn get_alt_setpoint(&self, loc: ndarray::ArrayView1<f64>) -> f64 {
-        let dist = self.target[2];
+        let dist = self.target[2] - loc[2];
         if dist > 0.5 {
             let timetotarget = dist / self.vel_limit;
-            let number_steps = timetotarget / 0.25;
+            let number_steps = timetotarget / 0.05;
             // compute distance for next update
             let delta_alt = dist / number_steps.round();
-            // 2 times for smoothing
-            loc[2] + 2. * delta_alt
+            // 4 times for smoothing
+            loc[2] + 4. * delta_alt
         } else {
             self.target[2]
         }

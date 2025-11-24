@@ -19,29 +19,22 @@ pub struct Drone {
 }
 
 impl Drone {
-    pub fn new(model: *mut mujoco_sys::mjModel, data: *mut mujoco_sys::mjData) -> Self {
+    pub fn new(model: *mut mujoco_sys::mjModel, data: *mut mujoco_sys::mjData, target: [f64;3]) -> Self {
 
         // magically precalculated tolerances
         
-        let mut rollpid   = pid::PID::new(2.6785,0.56871, 1.2508, 0.);
-        let mut pitchpid  = pid::PID::new(2.6785,0.56871, 1.2508, 0.);
-        rollpid.limits(-1., 1.);
-        pitchpid.limits(-1., 1.);
+        let rollpid   = pid::PID::with_limits(2.6785,0.56871, 1.2508, 0., 0., [Some(-1.), Some(1.)]);
+        let pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508, 0., 0., [Some(-1.), Some(1.)]);
+        let yawpid    = pid::PID::with_limits(0.54, 0., 5.358333, 1., 0.,     [Some(-3.), Some(3.)]);
 
-        let mut yawpid    = pid::PID::new(0.54, 0., 5.358333, 1.);
-        yawpid.limits(-3., -3.);
-
-        let mut pidvx   = pid::PID::new(0.1, 0.003, 0.02, 0.);
-        let mut pidvy   = pid::PID::new(0.1, 0.003, 0.02, 0.);
-
-        pidvx.limits(-0.1, 0.1);
-        pidvy.limits(-0.1, 0.1);
+        let pidvx   = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        let pidvy   = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
 
         Self { 
             model, 
             data, 
 
-            planner:   RefCell::new(planner::Planner::new([0.; 3], 2.)), 
+            planner:   RefCell::new(planner::Planner::new(target, 2.)), 
             pid_alt:   RefCell::new(pid::PID::new(5.50844,0.57871, 1.2, 0.)),
 
             pid_roll:  RefCell::new(rollpid), 
@@ -53,18 +46,21 @@ impl Drone {
         }
     } 
 
+    #[inline]
     fn velocity(&self) -> &[f64] {
         unsafe {
             slice::from_raw_parts_mut((*self.data).qvel, 6)
         }
     }
 
+    #[inline]
     fn position(&self) -> &[f64] {
         unsafe {
             slice::from_raw_parts_mut((*self.data).qpos, 7)
         }
     }
 
+    #[inline]
     fn acceleration(&self) -> &[f64] {
         unsafe {
             slice::from_raw_parts_mut((*self.data).qacc, 6)
@@ -74,6 +70,12 @@ impl Drone {
     pub fn outer(&mut self) {
         let vel  = self.velocity();
         let loc  = self.position();
+        //let acc  = self.acceleration();
+        //println!("===========================");
+        //println!("{vel:?}");
+        //println!("{loc:?}");
+        //println!("{acc:?}");
+        //println!("===========================");
         let velocities = self.planner.borrow_mut().calc(&loc[0..3]);
         self.pid_alt.borrow_mut().setpoint = self.planner.borrow_mut().get_alt_setpoint(
             ndarray::ArrayView1::from_shape(3, &loc[0..3]).unwrap()
@@ -90,17 +92,17 @@ impl Drone {
 
     fn thrusts(&self, thrust: f64, roll: f64, pitch: f64, yaw: f64) -> [f64; 4] {
         [
-            thrust + roll + pitch - yaw,
-            thrust - roll + pitch + yaw,
+            thrust + roll + pitch  - yaw,
+            thrust - roll + pitch  + yaw,
             thrust - roll -  pitch - yaw,
-            thrust + roll - pitch + yaw
+            thrust + roll - pitch  + yaw
         ]
     }
 
     pub fn inner(&mut self) {
         let pos =    self.position();
         let alt =    &pos[2];
-        let angles = &pos[3..]; // roll, yaw, pitch
+        let angles = &pos[3..6]; // roll, yaw, pitch
         
         // apply PID
         let cmd_thrust =   self.pid_alt.borrow_mut().calc(*alt, None).unwrap() + 3.2495;

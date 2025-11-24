@@ -1,9 +1,8 @@
 <mujoco model="Aerial Drone">
     <compiler autolimits="true" assetdir="assets"/>
-    <option timestep="0.002" gravity="0 0 -9.81">
+    <option timestep="0.01" density="1.225" viscosity="1.8e-5">
         <flag contact="enable"/>
     </option>
-    <option timestep="0.01" density="1.225" viscosity="1.8e-5"/>
 
     <statistic center="0 0 0.1" extent="0.6" meansize=".05"/>
 
@@ -49,7 +48,7 @@
         <light name="spotlight" mode="targetbodycom" target="x2" pos="0 -1 2"/>
         <body name="x2" pos="0 0 0.1" childclass="x2">
             <freejoint/>
-            <inertial pos="0 0 0" mass="0.5" diaginertia="0.002 0.002 0.004"/>
+            <!--<inertial pos="0 0 0" mass="1.0" diaginertia="0.002 0.002 0.004"/>-->
             <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
             <site name="imu" pos="0 0 .02"/>
             <geom material="phong3SG" mesh="X2_lowpoly" class="visual" quat="0 0 1 1"/>

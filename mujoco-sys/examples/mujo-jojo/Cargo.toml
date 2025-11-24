@@ -7,6 +7,5 @@ edition = "2024"
 mujoco-sys = { path = "../../../mujoco-sys" }
 glfw-sys = "6.0.0"
 glow = "0.16.0"
-nalgebra = "0.34.1"
 ndarray = "0.17.1"
 ndarray-linalg = "0.18.0"
