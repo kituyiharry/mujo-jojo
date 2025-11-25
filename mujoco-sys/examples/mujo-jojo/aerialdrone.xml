@@ -46,6 +46,10 @@
         <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
         <light name="spotlight" mode="targetbodycom" target="x2" pos="0 -1 2"/>
+
+        <geom name="red_box" type="box" pos="4.0 3.5 0.0" size="3.2 3.2 3.2" rgba="1 0 0 1"/>
+        <geom name="green_sphere"       pos="-4.0 -3.5 0.0" size="3.1" rgba="0 1 0 1"/>
+
         <body name="x2" pos="0 0 0.1" childclass="x2">
             <freejoint/>
             <inertial pos="0 0 0" mass="0.2" diaginertia="0.002 0.002 0.004"/>
