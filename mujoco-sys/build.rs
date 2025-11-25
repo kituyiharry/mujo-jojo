@@ -85,7 +85,7 @@ fn main() {
          // Add include path for system frameworks on macOS
         .header(format!("{}/include/mujoco/mujoco.h", mujoco_path.display()))
         .header(format!("{}/simulate/simulate.h", mujoco_path.display()))
-        .header(format!("{}/simulate/glfw_dispatch.h", mujoco_path.display()))
+        //.header(format!("{}/simulate/glfw_dispatch.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3native.h", mujoco_path.display()))
         .header(format!("{}/include/mujoco/mjexport.h", mujoco_path.display()))

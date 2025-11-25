@@ -1,8 +1,13 @@
+#![allow(static_mut_refs)]
+use image::{ImageBuffer, Rgb};
 use foxglove::convert::SaturatingInto;
-use foxglove::schemas::{ArrowPrimitive, Color, CubePrimitive, Pose, Quaternion, SceneEntity, SceneUpdate, Vector3};
+use foxglove::schemas::{ArrowPrimitive, Color, CompressedImage, CubePrimitive, PointCloud, Pose, Quaternion, SceneEntity, SceneUpdate, Timestamp, Vector3};
 use foxglove::{LazyChannel, LazyRawChannel};
 use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
 use glfw_sys::*;
+use once_cell::unsync::Lazy;
+use std::cell::UnsafeCell;
+use std::io::{Cursor};
 use std::sync::{self};
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -277,6 +282,31 @@ extern  "C" fn scroll(_window: *mut GLFWwindow, _xoffset: f64, yoffset: f64) {
 
 static DRONEDATA:  LazyRawChannel = LazyRawChannel::new("/dronectx", "json");
 static DRONESCENE: LazyChannel<SceneUpdate> = LazyChannel::new("/dronepose");
+static IMAGECHANL: LazyChannel<CompressedImage> = LazyChannel::new("/dronecam");
+//static DEPTHCHANL: LazyChannel<PointCloud> = LazyChannel::new("/dronecam");
+
+const WIDTH : i32 = 640;
+const HEIGHT: i32 = 480;
+const OFFSCR: f64 = 0.5;
+
+const CW: usize = (WIDTH  as f64*OFFSCR) as usize;
+const CH: usize = (HEIGHT as f64*OFFSCR) as usize; 
+
+static mut RGB8: Lazy<UnsafeCell<Vec<u8>>> = Lazy::new(||{ 
+    UnsafeCell::new(
+        vec![0;CW*CH*3]
+    )
+});
+static mut CNVIMG: Lazy<UnsafeCell<Vec<u8>>> = Lazy::new(||{ 
+    UnsafeCell::new(
+        Vec::with_capacity(CW*CH)
+    )
+});
+static mut DEPTH: Lazy<UnsafeCell<Vec<f32>>> =Lazy::new(||{
+    UnsafeCell::new(
+        vec![0.;CW*CH]
+    )
+});
 
 fn main() {
     let env = env_logger::Env::default().default_filter_or("debug");
@@ -298,6 +328,8 @@ fn main() {
         // avoid initializing outside main because it fails for some reason
         let c_str = CString::new("./aerialdrone.xml").expect("String contained interior null bytes");
         let mptr = c_str.as_c_str().as_ptr();
+
+        //mujoco_sys::mujoco_Simulate {};
 
         MODEL = mujoco_sys::mj_loadXML(mptr, ptr::null_mut(), p_error, p_errsz);
         DATA  = mujoco_sys::mj_makeData(MODEL);
@@ -321,14 +353,17 @@ fn main() {
             .is_null() { c"" } else { CStr::from_ptr(description) }); 
         }
 
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
         eprintln!("Initialized GLFW");
         let win = glfwCreateWindow(
-            320,
-            240,
+            WIDTH,
+            HEIGHT,
             c"Mujo-Jojo Simulation".as_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-    );
+        );
+        // prevent resize for the sake of the camera!
 
         glfwSetKeyCallback(win,         Some(keyboard));
         glfwSetMouseButtonCallback(win, Some(mouse_button));
@@ -381,7 +416,6 @@ fn main() {
             foxglove::WebSocketServer::new()
                 .start_blocking()
                 .expect("Server failed to start");
-
             while let Ok(drctx) = rcver.recv() {
                 DRONESCENE.log(&SceneUpdate { 
                     deletions: vec![], 
@@ -497,6 +531,19 @@ fn main() {
                         }
                     ]
                 });
+                let data = RGB8.get().as_mut().unwrap();
+                let mut ibuf = Cursor::new(CNVIMG.get().as_mut().unwrap());
+                let img_buffer: Option<ImageBuffer<Rgb<u8>, &[u8]>> = ImageBuffer::from_raw(CW as u32, CH as u32, &data[..]);
+                if let Some(img) = img_buffer {
+                    //img.save(format!("./output_image{stepc}.png")).expect("Failed to save image");
+                    img.write_to(&mut ibuf, image::ImageFormat::WebP).expect("write webp to buffer!");
+                    IMAGECHANL.log(&CompressedImage { 
+                        timestamp: Some(Timestamp::now()), 
+                        frame_id: "stream".to_owned(), 
+                        format:   "webp".into(), 
+                        data:     foxglove::bytes::Bytes::copy_from_slice(CNVIMG.get().as_mut().unwrap())
+                    });
+                };
                 match serde_json::to_string(&drctx) {
                     Ok(sjson) => {
                         DRONEDATA.log(sjson.as_bytes());
@@ -511,6 +558,27 @@ fn main() {
         drone.set_callback(Box::new(move |drctx|{
             sender.send(drctx).unwrap();
         }));
+
+        // These strings scare me!! sheesh
+        let sim = CString::new("stream").expect("cam id name"); 
+        let sim_camera = sim.as_c_str().as_ptr();
+        let camid = mujoco_sys::mj_name2id(drone.model, mujoco_sys::mjtObj::mjOBJ_CAMERA as i32, sim_camera);
+        if camid == -1 {
+            panic!("failed to get simulation camera! bailing!");
+        }
+        let offscreencam = &mut mujoco_sys::mjvCamera{
+            type_:      mujoco_sys::mjtCamera::mjCAMERA_FIXED as i32,
+            fixedcamid: camid,
+            trackbodyid: camid,
+            lookat:     [0.;3],
+            distance:   0.,
+            azimuth:    0.,
+            elevation:   0.,
+            orthographic: 0,
+        } as *mut mujoco_sys::mjvCamera;
+        // 3 RGB channels
+        // WARNING: i think resizing may affect this because mujoco camera sensors are just pixels from the
+        // gpu 
 
         while glfwWindowShouldClose(win) == 0 {
             // let now = glfwGetTime();
@@ -545,9 +613,29 @@ fn main() {
             let mut viewport = mujoco_sys::mjrRect_ { left: 0, bottom: 0, width: 0, height: 0 };
             glfwGetFramebufferSize(win, &mut viewport.width, &mut viewport.height);
 
+            let inset_width  = CW as i32;
+            let inset_height = CH as i32;
+            let loc_x = (viewport.width ) - inset_width;
+            let loc_y = (viewport.height) - inset_height;
+
+            let offscreenvport =  mujoco_sys::mjrRect_{ 
+                left:   loc_x        ,
+                bottom: loc_y        ,
+                width:  inset_width  ,
+                height: inset_height ,
+            };
+
             // update scene and render
             mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), CAM, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
             mujoco_sys::mjr_render(viewport, SCN, CON);
+            mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), offscreencam, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
+            mujoco_sys::mjr_render(offscreenvport, SCN, CON);
+            // copy pixels from image
+            mujoco_sys::mjr_readPixels(
+                RGB8.get().as_mut().unwrap().as_mut_ptr(), 
+                DEPTH.get().as_mut().unwrap().as_mut_ptr(), 
+                offscreenvport, CON
+            );
 
             glfwSwapBuffers(win);
             glfwPollEvents();
