@@ -1,3 +1,18 @@
+use foxglove::Encode;
+use serde::Serialize;
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Encode)]
+pub struct PidCtx {
+    pub proportional: f64,
+    pub integral:     f64,
+    pub derivative:   f64,
+    pub setpoint:     f64,
+    pub input:        f64,
+    pub output:       f64,
+    pub error :       f64,
+    pub time:         f64,
+}
+
 pub struct PID  {
     pub kp: f64,
     pub ki: f64,
@@ -10,6 +25,7 @@ pub struct PID  {
     pub differential_on_measurement: bool,
     pub error_map: fn(f64) -> f64,
     pub time_fn:   Box<dyn Fn() -> f64>,
+    pub callback:  Box<dyn Fn(PidCtx)>,
 
     proportional: f64,
     integral:     f64,
@@ -38,13 +54,14 @@ impl PID {
         let instant = std::time::Instant::now();
         let mut s = Self {
             kp, ki, kd, setpoint,
-            sample_time: 0.01,
+            sample_time: 0.001,
             outlims: [None, None],
             auto: true,
             proportional_on_measurement: false, 
             differential_on_measurement: true,
             error_map: |n|{ n },
             time_fn:   Box::new(move || instant.elapsed().as_secs_f64()), 
+            callback:  Box::new(|_| {}),
 
             proportional: 0.,
             integral:     0.,
@@ -59,6 +76,10 @@ impl PID {
         s
     }
 
+    pub fn set_callback(&mut self, callback: Box<dyn Fn(PidCtx)->()>) {
+        self.callback = callback
+    }
+
     pub fn with_limits(kp: f64, ki: f64, kd: f64, setpoint: f64, sout: f64, limits: [Option<f64>; 2]) -> Self {
         let instant = std::time::Instant::now();
         let mut s = Self {
@@ -70,6 +91,7 @@ impl PID {
             differential_on_measurement: true,
             error_map: |n|{ n },
             time_fn:   Box::new(move || instant.elapsed().as_secs_f64()), 
+            callback:  Box::new(|_| {}),
 
             proportional: 0.,
             integral:     clamp(Some(sout), limits[0], limits[1]).unwrap(),
@@ -159,6 +181,18 @@ impl PID {
 
         if dt < self.sample_time && self.last_output.is_some() {
             // Only update every sample_time seconds
+            (self.callback)(
+                PidCtx { 
+                    proportional: self.proportional, 
+                    integral:     self.integral, 
+                    derivative:   self.derivative, 
+                    setpoint:     self.setpoint, 
+                    input, 
+                    output:       self.last_output.unwrap_or(-1.),  // negative numbers to show unset values
+                    error:        self.last_error.unwrap_or(-1.),
+                    time:         self.last_time.unwrap_or(-1.)
+                }
+            );
             return self.last_output
         }
 
@@ -199,6 +233,18 @@ impl PID {
         self.last_error  = Some(error);
         self.last_time   = Some(now);
 
+        (self.callback)(
+            PidCtx { 
+                proportional: self.proportional, 
+                integral:     self.integral, 
+                derivative:   self.derivative, 
+                setpoint:     self.setpoint, 
+                input, 
+                output:       self.last_output.unwrap_or(-1.),  // negative numbers to show unset values
+                error:        self.last_error.unwrap_or(-1.),
+                time:         self.last_time.unwrap_or(-1.)
+            }
+        );
         Some(output)
     }
 

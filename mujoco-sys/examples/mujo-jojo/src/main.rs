@@ -1,9 +1,15 @@
-use mujoco_sys::{self, mjrContext, mjtVisFlag, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
+use foxglove::convert::SaturatingInto;
+use foxglove::schemas::{ArrowPrimitive, Color, CubePrimitive, Pose, Quaternion, SceneEntity, SceneUpdate, Vector3};
+use foxglove::{LazyChannel, LazyRawChannel};
+use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
 use glfw_sys::*;
-use std::thread::{sleep, sleep_ms};
+use std::sync::{self};
+use std::thread::{self, sleep};
 use std::time::Duration;
 use std::{ffi::CStr, ptr};
 use std::ffi::{CString};
+
+use crate::drone::DroneCtx;
 
 mod pid;
 mod planner;
@@ -244,7 +250,7 @@ extern "C" fn mouse_move(window: *mut GLFWwindow, xpos: f64, ypos: f64) {
 
         // get shift key state
         let mod_shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS;
+        glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS;
 
         // determine action based on mouse button
         let action: mujoco_sys::mjtMouse;
@@ -261,18 +267,20 @@ extern "C" fn mouse_move(window: *mut GLFWwindow, xpos: f64, ypos: f64) {
     }
 }
 
-
 // scroll callback
 extern  "C" fn scroll(_window: *mut GLFWwindow, _xoffset: f64, yoffset: f64) {
-  // emulate vertical mouse motion = 5% of window height
-  unsafe  {
-    mujoco_sys::mjv_moveCamera(MODEL, mujoco_sys::mjtMouse::mjMOUSE_ZOOM as std::ffi::c_int, 0., -0.05*yoffset, SCN, CAM);
-  }
+    // emulate vertical mouse motion = 5% of window height
+    unsafe  {
+        mujoco_sys::mjv_moveCamera(MODEL, mujoco_sys::mjtMouse::mjMOUSE_ZOOM as std::ffi::c_int, 0., -0.05*yoffset, SCN, CAM);
+    }
 }
 
-
+static DRONEDATA:  LazyRawChannel = LazyRawChannel::new("/dronectx", "json");
+static DRONESCENE: LazyChannel<SceneUpdate> = LazyChannel::new("/dronepose");
 
 fn main() {
+    let env = env_logger::Env::default().default_filter_or("debug");
+    env_logger::init_from_env(env);
     unsafe {
         let mut errbuf = Vec::with_capacity(1024);
         let p_error: *mut std::ffi::c_char = errbuf.as_mut_ptr();
@@ -288,20 +296,19 @@ fn main() {
         let mut description: *const i8 = std::ptr::null();
 
         // avoid initializing outside main because it fails for some reason
-        let c_string = CString::new("./aerialdrone.xml").expect("String contained interior null bytes");
-        let c_char_ptr = c_string.as_c_str();
-        let mptr = c_char_ptr.as_ptr();
+        let c_str = CString::new("./aerialdrone.xml").expect("String contained interior null bytes");
+        let mptr = c_str.as_c_str().as_ptr();
 
         MODEL = mujoco_sys::mj_loadXML(mptr, ptr::null_mut(), p_error, p_errsz);
         DATA  = mujoco_sys::mj_makeData(MODEL);
 
         if MODEL.is_null() || DATA.is_null() {
             eprintln!("NO SPEC or MODEL!!");
-            let rust_str = CStr::from_ptr(p_error).to_str().expect("C string contained invalid UTF-8");
+            let rstr = CStr::from_ptr(p_error).to_str().expect("C string contained invalid UTF-8");
             if p_error.is_null() {
-                eprintln!("{rust_str} no error!!??: {p_errsz}");
+                eprintln!("{rstr} no error!!??: {p_errsz}");
             } else {
-                eprintln!("{rust_str} error: {p_errsz}");
+                eprintln!("{rstr} error: {p_errsz}");
             }
             return
         }
@@ -309,20 +316,19 @@ fn main() {
         if glfwInit() != GLFW_TRUE {
             glfwGetError(&mut description);
             panic!(
-                "Error: {:?}\n",
-                if description
-                    .is_null() { c"" } else { CStr::from_ptr(description) }
-            );
+            "Error: {:?}\n",
+            if description
+            .is_null() { c"" } else { CStr::from_ptr(description) }); 
         }
 
         eprintln!("Initialized GLFW");
         let win = glfwCreateWindow(
-            1280,
-            720,
+            320,
+            240,
             c"Mujo-Jojo Simulation".as_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-        );
+    );
 
         glfwSetKeyCallback(win,         Some(keyboard));
         glfwSetMouseButtonCallback(win, Some(mouse_button));
@@ -333,10 +339,10 @@ fn main() {
             glfwGetError(&mut description);
 
             eprintln!(
-                "Error: {:?}\n",
-                if description
-                    .is_null() { c"" } else { CStr::from_ptr(description) }
-            );
+            "Error: {:?}\n",
+            if description
+            .is_null() { c"" } else { CStr::from_ptr(description) }
+        );
             glfwTerminate();
             panic!();
         }
@@ -363,21 +369,151 @@ fn main() {
         println!("Created OpenGL context with handle: {:?}\n", ctx);
 
         // Model init
-        let mut drone = drone::Drone::new(MODEL, DATA, [0.,0.,2.]);
+        let mut drone = drone::Drone::new(MODEL, DATA, [0.,0.,0.05]);
         let instant   = std::time::Instant::now();
         let start     = instant.elapsed().as_secs_f64();
         let mut step  = 1; 
         let mut completed = 0;
 
-        while glfwWindowShouldClose(win) == 0 {
-            // lets animate clear color based on time
-            // let now = glfwGetTime();
+        let (sender, rcver) = sync::mpsc::channel::<DroneCtx>();
 
-            //  advance interactive simulation for 1/60 sec
-            //  Assuming MuJoCo can simulate faster than real-time, which it usually can,
-            //  this loop will finish on time for the next frame to be rendered at 60 fps.
-            //  Otherwise add a cpu timer and exit this loop when it is time to render.
-            //  let simstart = (*DATA).time;
+        thread::spawn(move || {
+            foxglove::WebSocketServer::new()
+                .start_blocking()
+                .expect("Server failed to start");
+
+            while let Ok(drctx) = rcver.recv() {
+                DRONESCENE.log(&SceneUpdate { 
+                    deletions: vec![], 
+                    entities:  vec![
+                        SceneEntity {
+                            frame_id: "skydio drone".to_owned(),
+                            id: "skydio".to_owned(),
+                            lifetime: Some(Duration::from_millis(10_100).saturating_into()),
+                            arrows: vec![
+                                ArrowPrimitive { 
+                                    pose: Some(Pose {
+                                        position: Some(Vector3 {
+                                            x: drctx.position[0],
+                                            y: drctx.position[1],
+                                            z: drctx.position[2],
+                                        }),
+                                        orientation: Some(Quaternion {
+                                            x: drctx.position[3],
+                                            y: drctx.position[4],
+                                            z: drctx.position[5],
+                                            w: drctx.position[6],
+                                        }),
+                                    }),
+                                    shaft_length: drctx.velocity[0], 
+                                    shaft_diameter: 0.01, 
+                                    head_length:    0.001,
+                                    head_diameter:  0.001, 
+                                    color: Some(Color {
+                                        r: 0.0,
+                                        g: 1.0,
+                                        b: 0.0,
+                                        a: 1.0,
+                                    }), 
+                                },
+                                ArrowPrimitive { 
+                                    pose: Some(Pose {
+                                        position: Some(Vector3 {
+                                            x: drctx.position[0],
+                                            y: drctx.position[1],
+                                            z: drctx.position[2],
+                                        }),
+                                        orientation: Some(Quaternion {
+                                            x: drctx.position[3],
+                                            y: drctx.position[4],
+                                            z: drctx.position[5],
+                                            w: drctx.position[6],
+                                        }),
+                                    }),
+                                    shaft_length: drctx.velocity[1], 
+                                    shaft_diameter: 0.01, 
+                                    head_length:    0.001,
+                                    head_diameter:  0.001, 
+                                    color: Some(Color {
+                                        r: 0.6,
+                                        g: 0.5,
+                                        b: 0.4,
+                                        a: 1.0,
+                                    }), 
+                                },
+                                ArrowPrimitive { 
+                                    pose: Some(Pose {
+                                        position: Some(Vector3 {
+                                            x: drctx.position[0],
+                                            y: drctx.position[1],
+                                            z: drctx.position[2],
+                                        }),
+                                        orientation: Some(Quaternion {
+                                            x: drctx.position[3],
+                                            y: drctx.position[4],
+                                            z: drctx.position[5],
+                                            w: drctx.position[6],
+                                        }),
+                                    }),
+                                    shaft_length: drctx.velocity[2], 
+                                    shaft_diameter: 0.01, 
+                                    head_length:    0.001,
+                                    head_diameter:  0.001, 
+                                    color: Some(Color {
+                                        r: 0.0,
+                                        g: 1.0,
+                                        b: 1.0,
+                                        a: 1.0,
+                                    }), 
+                                },
+                            ],
+                            cubes: vec![CubePrimitive {
+                                pose: Some(Pose {
+                                    position: Some(Vector3 {
+                                        x: drctx.position[0],
+                                        y: drctx.position[1],
+                                        z: drctx.position[2],
+                                    }),
+                                    orientation: Some(Quaternion {
+                                        x: drctx.position[3],
+                                        y: drctx.position[4],
+                                        z: drctx.position[5],
+                                        w: drctx.position[6],
+                                    }),
+                                }),
+                                size: Some(Vector3 {
+                                    x: 0.16,
+                                    y: 0.04,
+                                    z: 0.02,
+                                }),
+                                color: Some(Color {
+                                    r: 1.0,
+                                    g: 0.0,
+                                    b: 0.0,
+                                    a: 1.0,
+                                }),
+                            }],
+                            ..Default::default()
+                        }
+                    ]
+                });
+                match serde_json::to_string(&drctx) {
+                    Ok(sjson) => {
+                        DRONEDATA.log(sjson.as_bytes());
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {:?}",e.to_string())
+                    }
+                };
+            }
+        });
+
+        drone.set_callback(Box::new(move |drctx|{
+            sender.send(drctx).unwrap();
+        }));
+
+        while glfwWindowShouldClose(win) == 0 {
+            // let now = glfwGetTime();
 
             let now  = instant.elapsed().as_secs_f64(); 
             let diff = now - start;
@@ -402,22 +538,18 @@ fn main() {
                 drone.outer();
             }
             drone.inner();
-
             step += 1;
 
             mujoco_sys::mj_step(MODEL, DATA);
 
             let mut viewport = mujoco_sys::mjrRect_ { left: 0, bottom: 0, width: 0, height: 0 };
-
-            glfwGetFramebufferSize(win, &mut viewport.width as *mut i32, &mut viewport.height as *mut i32,);
+            glfwGetFramebufferSize(win, &mut viewport.width, &mut viewport.height);
 
             // update scene and render
             mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), CAM, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
             mujoco_sys::mjr_render(viewport, SCN, CON);
 
             glfwSwapBuffers(win);
-            // don't use waitEvents as that might block event-loop inside wasm
-            // and never return control flow to browser
             glfwPollEvents();
 
             if glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_TRUE {
