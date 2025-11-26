@@ -13,3 +13,25 @@ be found by the linker in order to run examples.
 This project may not work properly on linux - but the others might.
 
 Also make sure glfw is available on your system for easier setup.
+
+to run the examples:
+
+```bash
+bash build.sh && cd ./mujoco-sys/examples/ && cargo run --example=basic
+
+bash build.sh && cd ./mujoco-sys/examples/mujo-jojo && cargo run
+```
+
+
+The script will copy the compiled mujoco library in the target folder so that it
+can be loaded on run but it may fail on other systems. Worth checking  if its there
+in case of errors.
+
+![Screenshot](./screenshot.png "screenshot")
+
+<p align="center">
+  <video src="./simulation.webm" width="500px"></video>
+</p>
+
+<!--![non working video](./simulation.webm)-->
+

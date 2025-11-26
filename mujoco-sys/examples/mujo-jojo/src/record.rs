@@ -110,34 +110,3 @@ fn rgb_to_yuv420(rgb: &ImageBuffer<Rgb<u8>, &[u8]>, width: usize, height: usize)
     [y_plane, u_plane, v_plane]
 }
 
-// Example usage
-// fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     // List of WebP image paths
-//     let image_paths = vec![
-//         "frame001.webp",
-//         "frame002.webp",
-//         "frame003.webp",
-//         // Add more frames...
-//     ];
-//     
-//     // Load first image to get dimensions
-//     let first_img = image::open(&image_paths[0])?;
-//     let (width, height) = first_img.dimensions();
-//     
-//     // Create encoder (30 fps)
-//     let mut encoder = VideoEncoder::new(width as usize, height as usize, 30)?;
-//     
-//     // Encode all frames
-//     for path in &image_paths {
-//         println!("Processing: {}", path);
-//         let img = image::open(path)?;
-//         encoder.add_frame(&img)?;
-//     }
-//     
-//     // Finalize and write output
-//     encoder.finish(Path::new("output.ivf"))?;
-//     
-//     println!("Video saved to output.ivf");
-//     
-//     Ok(())
-// }

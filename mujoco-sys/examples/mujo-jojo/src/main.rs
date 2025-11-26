@@ -416,27 +416,27 @@ fn main() {
         let (encsender, encrcver) = sync::mpsc::channel::<usize>();
 
         thread::spawn(move || {
-            let mut num = 0;
-            let length = std::time::Duration::from_secs_f64(2.5);
+            // let mut num = 0;
+            // let length = std::time::Duration::from_secs_f64(2.5);
             while encrcver.recv().is_ok()  {
 
-                let now = std::time::Instant::now();
-                let mut vid = VideoEncoder::new(CW, CH, 30).unwrap();
+                // let now = std::time::Instant::now();
+                // let mut vid = VideoEncoder::new(CW, CH, 30).unwrap();
 
                 // 2.5sec video
                 println!("encoding maneouver");
-                while now.elapsed() < length  {
-                    let data = SRGB8.get().as_mut().unwrap();
-                    let img_buffer: ImageBuffer<Rgb<u8>, &[u8]> = ImageBuffer::from_raw(CW as u32, CH as u32, &data[..]).unwrap();
-                    vid.add_frame(img_buffer).unwrap();
-                }
-                thread::spawn(move ||{
-                    // This encoder is really slow on Mac!!!!!!
-                    vid.finish(Path::new(&(format!("./video/maneouver_{}.ivf", num)))).unwrap();
-                });
+                // while now.elapsed() < length  {
+                //     let data = SRGB8.get().as_mut().unwrap();
+                //     let img_buffer: ImageBuffer<Rgb<u8>, &[u8]> = ImageBuffer::from_raw(CW as u32, CH as u32, &data[..]).unwrap();
+                //     vid.add_frame(img_buffer).unwrap();
+                // }
+                // thread::spawn(move ||{
+                //     // This encoder is really slow on Mac!!!!!!
+                //     vid.finish(Path::new(&(format!("./video/maneouver_{}.ivf", num)))).unwrap();
+                // });
                 println!("done encoding maneouver");
 
-                num += 1;
+                // num += 1;
             }
         });
 
