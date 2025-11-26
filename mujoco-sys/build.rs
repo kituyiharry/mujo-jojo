@@ -87,7 +87,7 @@ fn main() {
         .clang_arg(format!("-I{}/build/_deps/glfw3-src/include", mujoco_path.display()))
          // Add include path for system frameworks on macOS
         .header(format!("{}/include/mujoco/mujoco.h", mujoco_path.display()))
-        .header(format!("{}/simulate/simulate.h", mujoco_path.display()))
+        //.header(format!("{}/simulate/simulate.h", mujoco_path.display()))
         //.header(format!("{}/simulate/glfw_dispatch.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3native.h", mujoco_path.display()))
@@ -142,7 +142,7 @@ fn main() {
             //.generate_inline_functions(true)
             //.default_enum_style(EnumVariation::Rust { non_exhaustive: false, })
             .use_core()
-            .clang_arg("-std=c++20")
+            //.clang_arg("-std=c++20")
             .layout_tests(false)
             .derive_default(false)
             .derive_copy(false)
