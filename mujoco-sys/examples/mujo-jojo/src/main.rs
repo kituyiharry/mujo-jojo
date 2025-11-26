@@ -1,24 +1,26 @@
 #![allow(static_mut_refs)]
 use image::{ImageBuffer, Rgb};
-use foxglove::convert::SaturatingInto;
-use foxglove::schemas::{ArrowPrimitive, Color, CompressedImage, CubePrimitive, PointCloud, Pose, Quaternion, SceneEntity, SceneUpdate, Timestamp, Vector3};
+use foxglove::schemas::{ArrowPrimitive, Color, CompressedImage, CubePrimitive, Duration, Pose, Quaternion, SceneEntity, SceneUpdate, Timestamp, Vector3};
 use foxglove::{LazyChannel, LazyRawChannel};
 use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
 use glfw_sys::*;
 use once_cell::unsync::Lazy;
 use std::cell::UnsafeCell;
+use std::fs::{OpenOptions};
 use std::io::{Cursor};
+use std::path::Path;
 use std::sync::{self};
-use std::thread::{self, sleep};
-use std::time::Duration;
+use std::thread::{self, sleep, sleep_ms};
 use std::{ffi::CStr, ptr};
 use std::ffi::{CString};
 
 use crate::drone::DroneCtx;
+use crate::record::VideoEncoder;
 
 mod pid;
 mod planner;
 mod drone;
+mod record;
 
 // Adapted by hand from Mujoco sample and also some of glfw_sys init code.
 // https://github.com/google-deepmind/mujoco/blob/main/sample/basic.cc
@@ -292,7 +294,7 @@ const OFFSCR: f64 = 0.5;
 const CW: usize = (WIDTH  as f64*OFFSCR) as usize;
 const CH: usize = (HEIGHT as f64*OFFSCR) as usize; 
 
-static mut RGB8: Lazy<UnsafeCell<Vec<u8>>> = Lazy::new(||{ 
+static mut SRGB8: Lazy<UnsafeCell<Vec<u8>>> = Lazy::new(||{ 
     UnsafeCell::new(
         vec![0;CW*CH*3]
     )
@@ -329,7 +331,7 @@ fn main() {
         let c_str = CString::new("./aerialdrone.xml").expect("String contained interior null bytes");
         let mptr = c_str.as_c_str().as_ptr();
 
-        //mujoco_sys::mujoco_Simulate {};
+        //mujoco_sys::mujoco_Simulate_Load(this, m, d, displayed_filename);
 
         MODEL = mujoco_sys::mj_loadXML(mptr, ptr::null_mut(), p_error, p_errsz);
         DATA  = mujoco_sys::mj_makeData(MODEL);
@@ -410,20 +412,46 @@ fn main() {
         let mut step  = 1; 
         let mut completed = 0;
 
-        let (sender, rcver) = sync::mpsc::channel::<DroneCtx>();
+        let (netsender, netrcver) = sync::mpsc::channel::<DroneCtx>();
+        let (encsender, encrcver) = sync::mpsc::channel::<usize>();
+
+        thread::spawn(move || {
+            let mut num = 0;
+            let length = std::time::Duration::from_secs_f64(2.5);
+            while encrcver.recv().is_ok()  {
+
+                let now = std::time::Instant::now();
+                let mut vid = VideoEncoder::new(CW, CH, 30).unwrap();
+
+                // 2.5sec video
+                println!("encoding maneouver");
+                while now.elapsed() < length  {
+                    let data = SRGB8.get().as_mut().unwrap();
+                    let img_buffer: ImageBuffer<Rgb<u8>, &[u8]> = ImageBuffer::from_raw(CW as u32, CH as u32, &data[..]).unwrap();
+                    vid.add_frame(img_buffer).unwrap();
+                }
+                thread::spawn(move ||{
+                    // This encoder is really slow on Mac!!!!!!
+                    vid.finish(Path::new(&(format!("./video/maneouver_{}.ivf", num)))).unwrap();
+                });
+                println!("done encoding maneouver");
+
+                num += 1;
+            }
+        });
 
         thread::spawn(move || {
             foxglove::WebSocketServer::new()
                 .start_blocking()
                 .expect("Server failed to start");
-            while let Ok(drctx) = rcver.recv() {
+            while let Ok(drctx) = netrcver.recv() {
                 DRONESCENE.log(&SceneUpdate { 
                     deletions: vec![], 
                     entities:  vec![
                         SceneEntity {
                             frame_id: "skydio drone".to_owned(),
                             id: "skydio".to_owned(),
-                            lifetime: Some(Duration::from_millis(10_100).saturating_into()),
+                            lifetime: Some(Duration::new(0,0)),
                             arrows: vec![
                                 ArrowPrimitive { 
                                     pose: Some(Pose {
@@ -439,10 +467,10 @@ fn main() {
                                             w: drctx.position[6],
                                         }),
                                     }),
-                                    shaft_length: drctx.velocity[0], 
-                                    shaft_diameter: 0.01, 
-                                    head_length:    0.001,
-                                    head_diameter:  0.001, 
+                                    shaft_length: drctx.pitch, 
+                                    shaft_diameter:  0.1, 
+                                    head_length:    0.01,
+                                    head_diameter:  0.01, 
                                     color: Some(Color {
                                         r: 0.0,
                                         g: 1.0,
@@ -464,10 +492,10 @@ fn main() {
                                             w: drctx.position[6],
                                         }),
                                     }),
-                                    shaft_length: drctx.velocity[1], 
-                                    shaft_diameter: 0.01, 
-                                    head_length:    0.001,
-                                    head_diameter:  0.001, 
+                                    shaft_length: drctx.roll, 
+                                    shaft_diameter: 0.1, 
+                                    head_length:    0.01,
+                                    head_diameter:  0.01, 
                                     color: Some(Color {
                                         r: 0.6,
                                         g: 0.5,
@@ -489,7 +517,7 @@ fn main() {
                                             w: drctx.position[6],
                                         }),
                                     }),
-                                    shaft_length: drctx.velocity[2], 
+                                    shaft_length: drctx.thrust, 
                                     shaft_diameter: 0.01, 
                                     head_length:    0.001,
                                     head_diameter:  0.001, 
@@ -531,7 +559,7 @@ fn main() {
                         }
                     ]
                 });
-                let data = RGB8.get().as_mut().unwrap();
+                let data = SRGB8.get().as_mut().unwrap();
                 let mut ibuf = Cursor::new(CNVIMG.get().as_mut().unwrap());
                 let img_buffer: Option<ImageBuffer<Rgb<u8>, &[u8]>> = ImageBuffer::from_raw(CW as u32, CH as u32, &data[..]);
                 if let Some(img) = img_buffer {
@@ -556,7 +584,7 @@ fn main() {
         });
 
         drone.set_callback(Box::new(move |drctx|{
-            sender.send(drctx).unwrap();
+            netsender.send(drctx).unwrap();
         }));
 
         // These strings scare me!! sheesh
@@ -577,8 +605,8 @@ fn main() {
             orthographic: 0,
         } as *mut mujoco_sys::mjvCamera;
         // 3 RGB channels
-        // WARNING: i think resizing may affect this because mujoco camera sensors are just pixels from the
-        // gpu 
+        
+        sleep_ms(1000);
 
         while glfwWindowShouldClose(win) == 0 {
             // let now = glfwGetTime();
@@ -586,19 +614,22 @@ fn main() {
             let now  = instant.elapsed().as_secs_f64(); 
             let diff = now - start;
 
-            if diff > 2. && completed < 1 {
-                //println!("First waypoint");
-                //drone.planner.borrow_mut().update_target([1.,1.,1.]);
+            if diff > 5. && completed < 1 {
+                println!("First waypoint");
+                encsender.send(completed).unwrap();
+                drone.planner.borrow_mut().update_target([2.,2.,2.]);
                 completed += 1;
             }
             if (diff) > 10. && completed < 2 {
-                //println!("Second waypoint");
-                //drone.planner.borrow_mut().update_target([-1.,1.,2.]);
+                println!("Second waypoint");
+                encsender.send(completed).unwrap();
+                drone.planner.borrow_mut().update_target([-1.,1.,3.]);
                 completed += 1;
             }
             if (diff) > 18. && completed < 3 {
-                //println!("Third waypoint");
-                //drone.planner.borrow_mut().update_target([-1.,-1.,0.5]);
+                println!("Third waypoint");
+                encsender.send(completed).unwrap();
+                drone.planner.borrow_mut().update_target([-1.,-1.,0.5]);
                 completed += 1;
             }
 
@@ -631,8 +662,9 @@ fn main() {
             mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), offscreencam, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
             mujoco_sys::mjr_render(offscreenvport, SCN, CON);
             // copy pixels from image
+            // WARNING: i think resizing may affect this because mujoco camera sensors are just pixels from the gpu 
             mujoco_sys::mjr_readPixels(
-                RGB8.get().as_mut().unwrap().as_mut_ptr(), 
+                SRGB8.get().as_mut().unwrap().as_mut_ptr(), 
                 DEPTH.get().as_mut().unwrap().as_mut_ptr(), 
                 offscreenvport, CON
             );
@@ -648,7 +680,7 @@ fn main() {
             let time   = instant.elapsed().as_secs_f64();
             let t_next = (*MODEL).opt.timestep - (time - now);
             if t_next > 0. {
-                sleep(Duration::from_secs_f64(t_next));
+                sleep(std::time::Duration::from_secs_f64(t_next));
             }
         }
 

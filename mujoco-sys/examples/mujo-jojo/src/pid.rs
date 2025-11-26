@@ -54,7 +54,7 @@ impl PID {
         let instant = std::time::Instant::now();
         let mut s = Self {
             kp, ki, kd, setpoint,
-            sample_time: 0.001,
+            sample_time: 0.01,
             outlims: [None, None],
             auto: true,
             proportional_on_measurement: false, 
@@ -73,10 +73,11 @@ impl PID {
             last_error:   None,
         };
         s.reset();
+        s.integral = clamp(Some(0.), s.outlims[0], s.outlims[1]).unwrap();
         s
     }
 
-    pub fn set_callback(&mut self, callback: Box<dyn Fn(PidCtx)->()>) {
+    pub fn set_callback(&mut self, callback: Box<dyn Fn(PidCtx)>) {
         self.callback = callback
     }
 
@@ -103,6 +104,7 @@ impl PID {
             last_error:   None,
         };
         s.reset();
+        s.integral = clamp(Some(sout), s.outlims[0], s.outlims[1]).unwrap();
         s
     }
 
@@ -231,7 +233,7 @@ impl PID {
         self.last_output = Some(output);
         self.last_input  = Some(input);
         self.last_error  = Some(error);
-        self.last_time   = Some(now);
+        self.last_time   = Some((self.time_fn)());
 
         (self.callback)(
             PidCtx { 

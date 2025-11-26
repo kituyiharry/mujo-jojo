@@ -35,6 +35,9 @@ impl Planner {
         let mut pidx = PID::with_limits(2., 0.15, 1.5, target[0], 0., [Some(-vel),Some(vel)]);
         let mut pidy = PID::with_limits(2., 0.15, 1.5, target[1], 0., [Some(-vel),Some(vel)]);
 
+        //let mut pidx = PID::with_limits(1., 0., 0., target[0], 0., [Some(-vel),Some(vel)]);
+        //let mut pidy = PID::with_limits(1., 1., 1., target[1], 0., [Some(-vel),Some(vel)]);
+
         let pidxctx: Rc<Cell<PidCtx>> = Rc::default();
         let pidxcln  = Rc::clone(&pidxctx);
         let pidyctx: Rc<Cell<PidCtx>> = Rc::default();
@@ -80,7 +83,7 @@ impl Planner {
 
     pub fn get_alt_setpoint(&self, loc: ndarray::ArrayView1<f64>) -> f64 {
         let dist = self.target[2] - loc[2];
-        if dist > 0.5 {
+        if dist > 0.2 {
             let timetotarget = dist / self.vel_limit;
             let number_steps = timetotarget / 0.25;
             // compute distance for next update

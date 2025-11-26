@@ -20,6 +20,7 @@ pub struct Drone {
     pid_v_y:   pid::PID,
 
     // save modifications here
+    pub pidactx:  Rc<Cell<PidCtx>>,
     pub pidrctx:  Rc<Cell<PidCtx>>,
     pub pidpctx:  Rc<Cell<PidCtx>>,
     pub pidyctx:  Rc<Cell<PidCtx>>,
@@ -36,6 +37,7 @@ pub struct DroneCtx {
 
     pub planner: PlannerCtx,
 
+    pub pidactx:  PidCtx,
     pub pidroll:  PidCtx,
     pub pidptch:  PidCtx,
     pub pidyaw:   PidCtx,
@@ -68,13 +70,25 @@ impl Drone {
 
         // magically precalculated tolerances
         
-        let mut rollpid   = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
-        let mut pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
-        let mut yawpid    = pid::PID::with_limits(0.54,  0.,      5.358333,1., 0., [Some(-3.), Some(3.)]);
+        //let mut rollpid   = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
+        //let mut pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
+        //let mut yawpid    = pid::PID::with_limits(0.54,  0.,      5.358333,1., 0., [Some(-3.), Some(3.)]);
 
-        let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
-        let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        //let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        //let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        
+        //let mut pidalt    = pid::PID::with_limits(1.0, 0.5, 1.2, 0., 0., [Some(0.), None]);
+        let mut pidalt    = pid::PID::new(5.50844,0.57871, 1.2, 0.);
 
+        let mut rollpid   = pid::PID::with_limits(1.,  0.1,  1.,  0., 0., [Some(-1.), Some(1.)]);
+        let mut pitchpid  = pid::PID::with_limits(1.,  0.,   0.,  0., 0., [Some(-1.), Some(1.)]);
+        let mut yawpid    = pid::PID::with_limits(1.,  0.1,  0.1,  1.0, 0., [Some(-3.), Some(3.)]);
+
+        let mut pidvx     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
+        let mut pidvy     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
+
+        let pidactx:   Rc<Cell<PidCtx>> = Rc::default();
+        let pidacln  = Rc::clone(&pidactx);
         let pidrctx:   Rc<Cell<PidCtx>> = Rc::default();
         let pidrcln  = Rc::clone(&pidrctx);
         let pidpctx:   Rc<Cell<PidCtx>> = Rc::default();
@@ -88,6 +102,9 @@ impl Drone {
         let plannerc: Rc<Cell<PlannerCtx>> = Rc::default();
         let plnrclne = Rc::clone(&plannerc);
 
+        pidalt.set_callback(Box::new(move |lastctx| {
+            pidacln.set(lastctx);
+        }));
         rollpid.set_callback(Box::new(move |lastctx| {
             pidrcln.set(lastctx);
         }));
@@ -114,7 +131,7 @@ impl Drone {
             data, 
 
             planner:   RefCell::new(planner), 
-            pid_alt:   pid::PID::new(5.50844,0.57871, 1.2, 0.),
+            pid_alt:   pidalt,
 
             pid_roll:  rollpid, 
             pid_pitch: pitchpid,
@@ -123,6 +140,7 @@ impl Drone {
             pid_v_x:   pidvx, 
             pid_v_y:   pidvy, 
 
+            pidactx,
             pidrctx,
             pidpctx,
             pidyctx,
@@ -167,14 +185,14 @@ impl Drone {
             self.pid_alt.setpoint = self.planner.borrow_mut().get_alt_setpoint(
                 ndarray::ArrayView1::from_shape(3, &loc[0..3]).unwrap()
             );
+
             self.pid_v_x.setpoint = velocities[0];
             self.pid_v_y.setpoint = velocities[1];
 
-            let angle_pitch = self.pid_v_x.calc(vel[0], None).unwrap();
-            let angle_roll  = self.pid_v_y.calc(vel[1], None).unwrap();
-
-            self.pid_pitch.setpoint = angle_pitch;
-            self.pid_roll.setpoint  = angle_roll;
+            //let angle_pitch = self.pid_v_x.calc(vel[0], None).unwrap();
+            //let angle_roll  = self.pid_v_y.calc(vel[1], None).unwrap();
+            //self.pid_pitch.setpoint = angle_pitch;
+            //self.pid_roll.setpoint  = angle_roll;
 
             let mut v = [0.;6];
             let mut p = [0.;7];
@@ -188,6 +206,7 @@ impl Drone {
 
             (self.callback)(DroneCtx { 
                 planner:   self.plannerc.get(), 
+                pidactx:   self.pidactx.get(),
                 pidroll:   self.pidrctx.get(), 
                 pidptch:   self.pidpctx.get(), 
                 pidyaw:    self.pidyctx.get(), 
@@ -225,13 +244,13 @@ impl Drone {
             let pos = slice::from_raw_parts_mut((*self.data).qpos, 7);
             //self.position();
             let alt =    &pos[2];
-            let angles = &pos[3..6]; // roll, yaw, pitch
+            let angles = &pos[3..6];
 
             // apply PID
-            let cmd_thrust =   self.pid_alt.calc(*alt, None).unwrap() + 3.2495;
-            let cmd_roll   = - self.pid_roll.calc(angles[1], None).unwrap();
+            let cmd_thrust =   self.pid_alt.calc(       *alt, None).unwrap() + 3.2495;
+            let cmd_roll   = - self.pid_roll.calc( angles[1], None).unwrap();
             let cmd_pitch  =   self.pid_pitch.calc(angles[2], None).unwrap();
-            let cmd_yaw    = - self.pid_yaw.calc(angles[0], None).unwrap();
+            let cmd_yaw    = - self.pid_yaw.calc(  angles[0], None).unwrap();
 
             // transfer to motor control
             let out = self.thrusts(cmd_thrust, cmd_roll, cmd_pitch, cmd_yaw);
@@ -253,12 +272,13 @@ impl Drone {
             a.copy_from_slice(acc);
 
             (self.callback)(DroneCtx { 
-                planner:    self.plannerc.get(), 
-                pidroll:    self.pidrctx.get(), 
-                pidptch:    self.pidpctx.get(), 
-                pidyaw:     self.pidyctx.get(), 
-                pidvx:      self.pidvxctx.get(), 
-                pidvy:      self.pidvyctx.get(), 
+                planner:  self.plannerc.get(), 
+                pidactx:  self.pidactx.get(),
+                pidroll:  self.pidrctx.get(), 
+                pidptch:  self.pidpctx.get(), 
+                pidyaw:   self.pidyctx.get(), 
+                pidvx:    self.pidvxctx.get(), 
+                pidvy:    self.pidvyctx.get(), 
                 velocity: v,
                 position: p,
                 accelrtn: a,
