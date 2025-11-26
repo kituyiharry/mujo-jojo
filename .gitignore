@@ -3,3 +3,4 @@
 /mujoco-sys/target/
 /mujoco-sys/examples/mujo-jojo/target/
 /mujoco-sys/examples/mujo-jojo/video/
+/mujoco-sys/src/bindings.rs

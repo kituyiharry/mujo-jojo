@@ -53,7 +53,7 @@ impl<T> ::core::cmp::PartialEq for __BindgenUnionField<T> {
     }
 }
 impl<T> ::core::cmp::Eq for __BindgenUnionField<T> {}
-pub const mjVERSION_HEADER: u32 = 338;
+pub const mjVERSION_HEADER: u32 = 340;
 pub const mjMINVAL: f64 = 0.000000000000001;
 pub const mjPI: f64 = 3.141592653589793;
 pub const mjMAXVAL: f64 = 10000000000.0;
@@ -4013,6 +4013,14 @@ unsafe extern "C" {
         m: *const mjModel,
         d: *mut mjData,
         state: *const mjtNum,
+        sig: ::core::ffi::c_uint,
+    );
+}
+unsafe extern "C" {
+    pub fn mj_copyState(
+        m: *const mjModel,
+        src: *const mjData,
+        dst: *mut mjData,
         sig: ::core::ffi::c_uint,
     );
 }
