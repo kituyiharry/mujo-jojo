@@ -1,5 +1,8 @@
 ## Mujoco Sys Rust binding
 
+
+> NB: This has only been tested on MacOS
+
 ```bash
 # run this and cross fingers (tested on macos only)
 bash build.sh
@@ -21,6 +24,7 @@ bash build.sh && cd ./mujoco-sys/examples/ && cargo run --example=basic
 
 bash build.sh && cd ./mujoco-sys/examples/mujo-jojo && cargo run
 ```
+
 
 
 The script will copy the compiled mujoco library in the target folder so that it
