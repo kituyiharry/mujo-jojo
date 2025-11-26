@@ -15,7 +15,7 @@ mkdir -p ./mujoco-sys/target/release;
 mkdir -p ./mujoco-sys/target/debug;
 pwd;
 echo "============ copying libs"
-`cp -rv ./mujoco/build/lib/* ./mujoco-sys/target/release/`;
-`cp -rv ./mujoco/build/lib/* ./mujoco-sys/target/debug/`;
-`cp -rv ./mujoco/build/lib/* ./mujoco-sys/examples/mujo-jojo/target/release/`;
-`cp -rv ./mujoco/build/lib/* ./mujoco-sys/examples/mujo-jojo/target/debug/`;
+`cp -rfv ./mujoco/build/lib/* ./mujoco-sys/target/release/`;
+`cp -rfv ./mujoco/build/lib/* ./mujoco-sys/target/debug/`;
+`cp -rfv ./mujoco/build/lib/* ./mujoco-sys/examples/mujo-jojo/target/release/`;
+`cp -rfv ./mujoco/build/lib/* ./mujoco-sys/examples/mujo-jojo/target/debug/`;

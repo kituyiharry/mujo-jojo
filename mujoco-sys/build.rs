@@ -53,8 +53,11 @@ fn main() {
         format!("{}/build/lib", mujoco_path.display())
     );
 
-    #[cfg(unix)]
+    #[cfg(target_os = "macos")]
         let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.dylib");
+
+    #[cfg(target_os = "linux")]
+        let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.so");
 
     #[cfg(windows)]
     let mj_lib_mujoco_path = mj_lib_pathbuf.join("mujoco.lib");
