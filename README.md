@@ -15,7 +15,8 @@ generated shared libraries in `$BINDGEN_MUJOCO_PATH` into a directory that can
 be found by the linker in order to run examples.
 
 > This project may not work properly on linux - check build.sh for some needed
-> alterations - but the others might.
+> alterations. For best results please use a system wide installation of Mujoco
+> on linux
 
 Also make sure glfw is available on your system for easier setup.
 
