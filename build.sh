@@ -1,6 +1,8 @@
 echo "============ building mujoco from source"
 git clone --depth=1 https://github.com/google-deepmind/mujoco.git;
 pushd $(pwd);
+# this may work on Linux
+#cd ./mujoco &&  cmake -B build -S . -DCMAKE_CXX_COMPILER_AR=/usr/bin/ar -DCMAKE_C_COMPILER_AR=/usr/bin/ar -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_RANLIB=/usr/bin/ranlib -DCMAKE_C_COMPILER_RANLIB=/usr/bin/ranlib -DBUILD_SHARED_LIBS:BOOL=true -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=false && cmake --build build --parallel --target glfw libmujoco_simulate --config=Release;
 cd ./mujoco &&  cmake -B build -S . -DBUILD_SHARED_LIBS:BOOL=true -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=false && cmake --build build --parallel --target glfw libmujoco_simulate --config=Release;
 popd;
 CWD=$(pwd);

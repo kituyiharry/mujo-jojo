@@ -115,7 +115,8 @@ fn main() {
                     .arg("--show-sdk-path")
                     .output()
                     .expect("Failed to execute xcrun")
-                    .stdout).trim()
+                    .stdout
+                ).trim()
                 //.trim()
             ).use_core()
             .clang_arg("-std=c++20")
