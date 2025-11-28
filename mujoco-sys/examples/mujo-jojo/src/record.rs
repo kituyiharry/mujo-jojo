@@ -29,7 +29,7 @@ impl VideoEncoder {
         })
     }
     
-    pub fn add_frame(&mut self, img: ImageBuffer<Rgb<u8>, &[u8]>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_frame(&mut self, img: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<(), Box<dyn std::error::Error>> {
         let (width, height) = img.dimensions();
         let rgb_img = img;
         
@@ -78,7 +78,7 @@ impl VideoEncoder {
 }
 
 // Simple RGB to YUV420 conversion
-fn rgb_to_yuv420(rgb: &ImageBuffer<Rgb<u8>, &[u8]>, width: usize, height: usize) -> [Vec<u8>; 3] {
+fn rgb_to_yuv420(rgb: &ImageBuffer<Rgb<u8>, Vec<u8>>, width: usize, height: usize) -> [Vec<u8>; 3] {
     let mut y_plane = vec![0u8; width * height];
     let mut u_plane = vec![0u8; (width / 2) * (height / 2)];
     let mut v_plane = vec![0u8; (width / 2) * (height / 2)];
