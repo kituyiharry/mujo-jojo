@@ -387,7 +387,6 @@ fn main() {
         glfwMakeContextCurrent(win);
         glfwSwapInterval(1);
 
-
         // initialize visualization data structures
         mujoco_sys::mjv_defaultCamera(CAM);
         mujoco_sys::mjv_defaultOption(OPT);
@@ -416,12 +415,12 @@ fn main() {
         let (encsender, encrcver) = sync::mpsc::channel::<usize>();
 
         thread::spawn(move || {
-             let mut num = 0;
-             let length = std::time::Duration::from_secs_f64(3.0);
+            let mut num = 0;
+            let length = std::time::Duration::from_secs_f64(3.0);
             while encrcver.recv().is_ok()  {
 
-                 let now = std::time::Instant::now();
-                 let mut vid = VideoEncoder::new(CW, CH, 30).unwrap();
+                let now = std::time::Instant::now();
+                let mut vid = VideoEncoder::new(CW, CH, 30).unwrap();
 
                 // 2.5sec video
                 println!("encoding maneouver");

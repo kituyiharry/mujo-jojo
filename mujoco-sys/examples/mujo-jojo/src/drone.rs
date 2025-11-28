@@ -70,22 +70,22 @@ impl Drone {
 
         // magically precalculated tolerances
         
-        //let mut rollpid   = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
-        //let mut pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
-        //let mut yawpid    = pid::PID::with_limits(0.54,  0.,      5.358333,1., 0., [Some(-3.), Some(3.)]);
+        let mut rollpid   = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
+        let mut pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
+        let mut yawpid    = pid::PID::with_limits(0.54,  0.,      5.358333,1., 0., [Some(-3.), Some(3.)]);
 
-        //let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
-        //let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
+        let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
         
-        //let mut pidalt    = pid::PID::with_limits(1.0, 0.5, 1.2, 0., 0., [Some(0.), None]);
         let mut pidalt    = pid::PID::new(5.50844,0.57871, 1.2, 0.);
 
-        let mut rollpid   = pid::PID::with_limits(1.,  0.1,  1.,  0., 0., [Some(-1.), Some(1.)]);
-        let mut pitchpid  = pid::PID::with_limits(1.,  0.,   0.,  0., 0., [Some(-1.), Some(1.)]);
-        let mut yawpid    = pid::PID::with_limits(1.,  0.1,  0.1,  1.0, 0., [Some(-3.), Some(3.)]);
+        //let mut pidalt    = pid::PID::with_limits(1.0, 0.5, 1.2, 0., 0., [Some(0.), None]);
+        //let mut rollpid   = pid::PID::with_limits(1.,  0.1,  1.,  0., 0., [Some(-1.), Some(1.)]);
+        //let mut pitchpid  = pid::PID::with_limits(1.,  0.,   0.,  0., 0., [Some(-1.), Some(1.)]);
+        //let mut yawpid    = pid::PID::with_limits(1.,  0.1,  0.1,  1.0, 0., [Some(-3.), Some(3.)]);
 
-        let mut pidvx     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
-        let mut pidvy     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
+        //let mut pidvx     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
+        //let mut pidvy     = pid::PID::with_limits(1., 0.1, 0.1, 0., 0., [Some(-0.1), Some(0.1)]);
 
         let pidactx:   Rc<Cell<PidCtx>> = Rc::default();
         let pidacln  = Rc::clone(&pidactx);
@@ -189,10 +189,10 @@ impl Drone {
             self.pid_v_x.setpoint = velocities[0];
             self.pid_v_y.setpoint = velocities[1];
 
-            //let angle_pitch = self.pid_v_x.calc(vel[0], None).unwrap();
-            //let angle_roll  = self.pid_v_y.calc(vel[1], None).unwrap();
-            //self.pid_pitch.setpoint = angle_pitch;
-            //self.pid_roll.setpoint  = angle_roll;
+            let angle_pitch = self.pid_v_x.calc(vel[0], None).unwrap();
+            let angle_roll  = self.pid_v_y.calc(vel[1], None).unwrap();
+            self.pid_pitch.setpoint = angle_pitch;
+            self.pid_roll.setpoint  = angle_roll;
 
             let mut v = [0.;6];
             let mut p = [0.;7];

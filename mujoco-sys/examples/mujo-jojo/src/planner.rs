@@ -85,7 +85,7 @@ impl Planner {
         let dist = self.target[2] - loc[2];
         if dist > 0.2 {
             let timetotarget = dist / self.vel_limit;
-            let number_steps = timetotarget / 0.25;
+            let number_steps = timetotarget / 0.33;
             // compute distance for next update
             let delta_alt = dist / number_steps.round();
             // 4 times for smoothing
