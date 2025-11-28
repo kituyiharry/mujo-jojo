@@ -437,7 +437,7 @@ fn main() {
                 });
                 println!("done encoding maneouver");
 
-                // num += 1;
+                num += 1;
             }
         });
 
