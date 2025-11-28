@@ -442,7 +442,7 @@ fn main() {
         });
 
         thread::spawn(move || {
-            foxglove::WebSocketServer::new()
+            foxglove::WebSocketServer::new().bind("0.0.0.0", 8765)
                 .start_blocking()
                 .expect("Server failed to start");
             while let Ok(drctx) = netrcver.recv() {
