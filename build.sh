@@ -4,8 +4,14 @@ pushd $(pwd);
 # this may work on Linux
 #AR=$(which ar)
 #RANLIB=$(which ranlib)
-#cd ./mujoco &&  cmake -B build -S . -DCMAKE_CXX_COMPILER_AR=$AR -DCMAKE_C_COMPILER_AR=$AR -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_RANLIB=$RANLIB -DCMAKE_C_COMPILER_RANLIB=$RANLIB -DBUILD_SHARED_LIBS:BOOL=true -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=false && cmake --build build --parallel --target glfw libmujoco_simulate --config=Release;
-cd ./mujoco &&  cmake -B build -S . -DBUILD_SHARED_LIBS:BOOL=true -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=false && cmake --build build --parallel --config=Release;
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    cmake -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_CXX_COMPILER_AR=/usr/bin/ar -DCMAKE_C_COMPILER_AR=/usr/bin/ar -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_COMPILER_RANLIB=/usr/bin/ranlib -DCMAKE_C_COMPILER_RANLIB=/usr/bin/ranlib  -DCMAKE_INSTALL_PREFIX=/usr \
+        -B build \
+        -G Ninja \
+        -Wno-dev && cd ./mujoco/build && ninja && cd ../../
+else
+    cd ./mujoco &&  cmake -B build -S . -DBUILD_SHARED_LIBS:BOOL=true -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=false && cmake --build build --parallel --config=Release;
 popd;
 CWD=$(pwd);
 export BINDGEN_MUJOCO_PATH=$CWD/mujoco;
