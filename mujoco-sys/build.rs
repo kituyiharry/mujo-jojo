@@ -42,7 +42,7 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=BINDGEN_MUJOCO_PATH");
     println!("Ensure that BINDGEN_MUJOCO_PATH is set to get headers and xcrun from xcode command line tools is available!
-    on linux you will need cmake and ninja build system. Some c++ headers may need to be manually added to this build script (mujoco-sys/build.rs) or you can opt out of the simulation header files for a slightly smoother experience
+    on linux you will need cmake and ninja build system. Some c++ headers may need to be manually added to this build script (mujoco-sys/build.rs) or you can opt out of the simulation header files (simulate.h) by commenting them out for a slightly smoother experience
     ");
 
     let mujoco_path = if let Ok(path) = env::var("BINDGEN_MUJOCO_PATH") {
