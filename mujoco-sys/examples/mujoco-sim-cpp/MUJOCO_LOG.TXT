@@ -1,0 +1,5 @@
+Sat Nov 29 21:35:08 2025
+ERROR: mj_stackAlloc: out of memory, stack overflow at mj_collideTree, line 653
+  max = 13631488, available = 13631408, requested = 8509538840
+ nefc = 0, ncon = 0
+

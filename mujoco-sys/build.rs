@@ -54,10 +54,10 @@ fn main() {
     );
 
     #[cfg(target_os = "macos")]
-        let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.dylib");
+    let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.dylib");
 
     #[cfg(target_os = "linux")]
-        let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.so");
+    let mj_lib_mujoco_path = mujoco_lib_path.join("libmujoco.so");
 
     #[cfg(windows)]
     let mj_lib_mujoco_path = mj_lib_pathbuf.join("mujoco.lib");
@@ -87,8 +87,9 @@ fn main() {
         .clang_arg(format!("-I{}/build/_deps/glfw3-src/include", mujoco_path.display()))
          // Add include path for system frameworks on macOS
         .header(format!("{}/include/mujoco/mujoco.h", mujoco_path.display()))
-        //.header(format!("{}/simulate/simulate.h", mujoco_path.display()))
-        //.header(format!("{}/simulate/glfw_dispatch.h", mujoco_path.display()))
+        .header(format!("{}/simulate/simulate.h", mujoco_path.display()))
+        .header(format!("{}/simulate/glfw_dispatch.h", mujoco_path.display()))
+        .header(format!("{}/simulate/glfw_adapter.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3.h", mujoco_path.display()))
         //.header(format!("{}/build/_deps/glfw3-src/include/GLFW/glfw3native.h", mujoco_path.display()))
         .header(format!("{}/include/mujoco/mjexport.h", mujoco_path.display()))

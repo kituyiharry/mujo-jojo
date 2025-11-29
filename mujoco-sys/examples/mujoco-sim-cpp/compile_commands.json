@@ -1,0 +1,9 @@
+[
+    {
+        "directory": "/Users/harrykwakuloba/Developer/Robotics/mujoco-sys/examples/mujoco-sim-cpp/",
+        "command": "/usr/bin/c++ -DEIGEN_MPL2_ONLY -DmjUSEPLATFORMSIMD -I/Users/harrykwakuloba/Developer/Robotics/mujoco/build/_deps/marchingcubecpp-src -I/Users/harrykwakuloba/Developer/Robotics/mujoco/build/_deps/trianglemeshdistance-src -I/Users/harrykwakuloba/Developer/Robotics/mujoco/simulate -I/Users/harrykwakuloba/Developer/Robotics/mujoco/build/_deps/glfw3-src/include -I/Users/harrykwakuloba/Developer/Robotics/mujoco/include -O3 -DNDEBUG -std=c++20 -flto=thin -arch arm64 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -fdata-sections -ffunction-sections -mmacosx-version-min=11 -Werror=partial-availability -Werror=unguarded-availability -Werror -Wall -Wpedantic -Wimplicit-fallthrough -Wunused -Wvla -Wno-int-in-bool-context -Wno-sign-compare -Wno-unknown-pragmas -o ./bridge.cc.o -c ./bridge.cc",
+        "file": "./bridge.cc",
+        "output": "./bridge.cc.o"
+    }
+]
+// "directory": "/Users/harrykwakuloba/Developer/Robotics/mujoco/build/simulate",

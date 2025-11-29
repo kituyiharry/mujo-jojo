@@ -1,0 +1,19 @@
+[package]
+name = "mujoco-sim-cpp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+autocxx = "0.30.0"
+autocxx-build = "0.30.0"
+cxx = "1.0.189"
+mujoco-sys = { path = "../../../mujoco-sys" }
+ndarray = "0.17.1"
+ndarray-linalg = "0.18.0"
+serde = "1.0.228"
+serde_json = "1.0.145"
+
+[build-dependencies]
+autocxx-build = "0.30.0"
+cxx-build = "1.0.189"
+

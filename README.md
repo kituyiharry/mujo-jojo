@@ -35,8 +35,8 @@ in case of errors.
 ![Screenshot](./screenshot.png "screenshot")
 
 <p align="center">
-  <video src="./simulation.webm" width="500px"></video>
+  <video src="./simulation.mp4" width="500px"></video>
 </p>
 
-![simulation video](./simulation.webm)
+![simulation video](./simulation.mp4)
 

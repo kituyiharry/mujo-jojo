@@ -4,3 +4,5 @@
 /mujoco-sys/examples/mujo-jojo/target/
 /mujoco-sys/examples/mujo-jojo/video/
 /mujoco-sys/src/bindings.rs
+/mujoco-sys/examples/mujoco-sim-cpp/target/
+/mujoco-sys/examples/mujoco-sim-cpp/.cache/

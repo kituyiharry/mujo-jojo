@@ -2,7 +2,7 @@
 use image::{ImageBuffer, Rgb};
 use foxglove::schemas::{ArrowPrimitive, Color, CompressedImage, CubePrimitive, Duration, Pose, Quaternion, SceneEntity, SceneUpdate, Timestamp, Vector3};
 use foxglove::{LazyChannel, LazyRawChannel};
-use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvScene};
+use mujoco_sys::{self, mjrContext, mjvCamera, mjvGLCamera_, mjvGeom_, mjvLight_, mjvOption, mjvPerturb, mjvScene, mujoco_Simulate_Sync};
 use glfw_sys::*;
 use once_cell::unsync::Lazy;
 use std::cell::UnsafeCell;
@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::{self};
 use std::thread::{self, sleep, sleep_ms};
 use std::{ffi::CStr, ptr};
-use std::ffi::{CString};
+use std::ffi::{CString, c_char};
 
 use crate::drone::DroneCtx;
 use crate::record::VideoEncoder;
@@ -27,6 +27,19 @@ mod record;
 
 static mut MODEL: *mut mujoco_sys::mjModel = ptr::null_mut();
 static mut DATA : *mut mujoco_sys::mjData_ = ptr::null_mut();
+static mut PERT : *mut mujoco_sys::mjvPerturb = &mut mjvPerturb {
+    select: 0,
+    flexselect: 0,
+    skinselect: 0,
+    active: 0,
+    active2: 0,
+    refpos: [0.;3],
+    refquat: [0.;4],
+    refselpos: [0.;3],
+    localpos: [0.;3],
+    localmass: 0.,
+    scale: 0. 
+};
 static mut CAM  : *mut mujoco_sys::mjvCamera = &mut mjvCamera{ 
     type_:        0, 
     fixedcamid:   0, 
@@ -331,8 +344,6 @@ fn main() {
         let c_str = CString::new("./aerialdrone.xml").expect("String contained interior null bytes");
         let mptr = c_str.as_c_str().as_ptr();
 
-        //mujoco_sys::mujoco_Simulate_Load(this, m, d, displayed_filename);
-
         MODEL = mujoco_sys::mj_loadXML(mptr, ptr::null_mut(), p_error, p_errsz);
         DATA  = mujoco_sys::mj_makeData(MODEL);
 
@@ -392,6 +403,7 @@ fn main() {
         mujoco_sys::mjv_defaultOption(OPT);
         mujoco_sys::mjv_defaultScene(SCN);
         mujoco_sys::mjr_defaultContext(CON);
+        mujoco_sys::mjv_defaultPerturb(PERT);
 
         // create scene and context
         mujoco_sys::mjv_makeScene(MODEL, SCN, 2000);
@@ -588,8 +600,10 @@ fn main() {
         }));
 
         // These strings scare me!! sheesh
-        let sim = CString::new("stream").expect("cam id name"); 
-        let sim_camera = sim.as_c_str().as_ptr();
+        // see: https://users.rust-lang.org/t/calling-ffi-c-library-with-c-internal-implementation/39429/10#:~:text=creates%20a%20dangling,You%20should%20do%3A
+        //let sim = CString::new("stream").expect("cam id name"); 
+        //let sim = CString::new("stream").expect("cam id name"); 
+        let sim_camera: *const c_char = "stream".as_ptr().cast();
         let camid = mujoco_sys::mj_name2id(drone.model, mujoco_sys::mjtObj::mjOBJ_CAMERA as i32, sim_camera);
         if camid == -1 {
             panic!("failed to get simulation camera! bailing!");
@@ -657,9 +671,9 @@ fn main() {
             };
 
             // update scene and render
-            mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), CAM, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
+            mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, PERT, CAM, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
             mujoco_sys::mjr_render(viewport, SCN, CON);
-            mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, ptr::null_mut(), offscreencam, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
+            mujoco_sys::mjv_updateScene(MODEL, DATA, OPT, PERT, offscreencam, mujoco_sys::mjtCatBit_::mjCAT_ALL as i32, SCN);
             mujoco_sys::mjr_render(offscreenvport, SCN, CON);
             // copy pixels from image
             // WARNING: i think resizing may affect this because mujoco camera sensors are just pixels from the gpu 
@@ -676,6 +690,8 @@ fn main() {
                 glfwMakeContextCurrent(std::ptr::null_mut());
                 glfwDestroyWindow(win);
             }
+
+            //mujoco_Simulate_Sync(this, state_only);
 
             let time   = instant.elapsed().as_secs_f64();
             let t_next = (*MODEL).opt.timestep - (time - now);
