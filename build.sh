@@ -5,6 +5,7 @@ pushd $(pwd);
 #AR=$(which ar)
 #RANLIB=$(which ranlib)
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo "if you don't need the simulation header files please comment them out it build.rs! (simulate.h, glfw_adapter.h) and leave mujoco specific headers only"
     echo "please install mold linker for quicker (and saner) setup"
     cd mujoco && cmake -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_CXX_COMPILER_AR=/usr/bin/ar -DCMAKE_C_COMPILER_AR=/usr/bin/ar -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_COMPILER_RANLIB=/usr/bin/ranlib -DCMAKE_C_COMPILER_RANLIB=/usr/bin/ranlib  -DCMAKE_INSTALL_PREFIX=/usr \
