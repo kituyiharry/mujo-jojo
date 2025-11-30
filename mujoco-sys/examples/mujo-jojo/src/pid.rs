@@ -54,7 +54,7 @@ impl PID {
         let instant = std::time::Instant::now();
         let mut s = Self {
             kp, ki, kd, setpoint,
-            sample_time: 0.03,
+            sample_time: 0.01,
             outlims: [None, None],
             auto: true,
             proportional_on_measurement: false, 
@@ -85,7 +85,7 @@ impl PID {
         let instant = std::time::Instant::now();
         let mut s = Self {
             kp, ki, kd, setpoint,
-            sample_time: 0.03,
+            sample_time: 0.01,
             outlims: limits,
             auto: true,
             proportional_on_measurement: false, 

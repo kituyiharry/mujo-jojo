@@ -83,9 +83,9 @@ impl Planner {
 
     pub fn get_alt_setpoint(&self, loc: ndarray::ArrayView1<f64>) -> f64 {
         let dist = self.target[2] - loc[2];
-        if dist > 0.2 {
+        if dist > 0.5 {
             let timetotarget = dist / self.vel_limit;
-            let number_steps = timetotarget / 0.33;
+            let number_steps = timetotarget / 0.25;
             // compute distance for next update
             let delta_alt = dist / number_steps.round();
             // 4 times for smoothing

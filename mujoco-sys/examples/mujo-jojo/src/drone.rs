@@ -74,9 +74,12 @@ impl Drone {
         let mut pitchpid  = pid::PID::with_limits(2.6785,0.56871, 1.2508,  0., 0., [Some(-1.), Some(1.)]);
         let mut yawpid    = pid::PID::with_limits(0.54,  0.,      5.358333,1., 0., [Some(-3.), Some(3.)]);
 
-        let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
-        let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.1), Some(0.1)]);
-        
+        let mut pidvx     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.01), Some(0.01)]);
+        let mut pidvy     = pid::PID::with_limits(0.1, 0.003, 0.02, 0., 0., [Some(-0.01), Some(0.01)]);
+
+        pidvx.sample_time = 0.01;
+        pidvy.sample_time = 0.01;
+
         let mut pidalt    = pid::PID::new(5.50844,0.57871, 1.2, 0.);
 
         //let mut pidalt    = pid::PID::with_limits(1.0, 0.5, 1.2, 0., 0., [Some(0.), None]);
@@ -121,7 +124,7 @@ impl Drone {
             pidvycln.set(lastctx);
         }));
 
-        let mut planner =  planner::Planner::new(target, 1.);
+        let mut planner =  planner::Planner::new(target, 2.);
         planner.set_callback(Box::new(move |lastctx|{
             plnrclne.set(lastctx);
         }));

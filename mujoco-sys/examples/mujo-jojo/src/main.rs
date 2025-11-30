@@ -417,7 +417,7 @@ fn main() {
         println!("Created OpenGL context with handle: {:?}\n", ctx);
 
         // Model init
-        let mut drone = drone::Drone::new(MODEL, DATA, [0.,0.,0.05]);
+        let mut drone = drone::Drone::new(MODEL, DATA, [0.,0.,1.]);
         let instant   = std::time::Instant::now();
         let start     = instant.elapsed().as_secs_f64();
         let mut step  = 1; 
@@ -631,19 +631,19 @@ fn main() {
 
             if diff > 5. && completed < 1 {
                 println!("First waypoint");
-                encsender.send(completed).unwrap();
-                drone.planner.borrow_mut().update_target([2.,2.,2.]);
+                //encsender.send(completed).unwrap();
+                drone.planner.borrow_mut().update_target([1.,1.,1.]);
                 completed += 1;
             }
-            if (diff) > 10. && completed < 2 {
+            if (diff) > 7. && completed < 2 {
                 println!("Second waypoint");
-                encsender.send(completed).unwrap();
-                drone.planner.borrow_mut().update_target([-1.,1.,3.]);
+                //encsender.send(completed).unwrap();
+                drone.planner.borrow_mut().update_target([-1.,1.,2.]);
                 completed += 1;
             }
-            if (diff) > 18. && completed < 3 {
+            if (diff) > 10. && completed < 3 {
                 println!("Third waypoint");
-                encsender.send(completed).unwrap();
+                //encsender.send(completed).unwrap();
                 drone.planner.borrow_mut().update_target([-1.,-1.,0.5]);
                 completed += 1;
             }
