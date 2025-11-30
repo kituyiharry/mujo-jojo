@@ -238,7 +238,7 @@ fn main() {
             CAM as  *mut ffi::mjvCamera, 
             OPT as  *mut ffi::mjvOption, 
             PERT as *mut ffi::mjvPerturb, 
-            false
+            true
         );
 
         SIM = ptr.as_mut_ptr() as *mut mujoco_Simulate;
@@ -248,8 +248,8 @@ fn main() {
             let mut drone = drone::Drone::new((*SIM).m_, (*SIM).d_, [0.,0.,1.0]);
             let instant   = std::time::Instant::now();
             let start     = instant.elapsed().as_secs_f64();
-            let length = Duration::from_secs(15);
-            let mut step = 0;
+            let length    = Duration::from_secs(15);
+            let mut step  = 0;
             let mut completed = 0;
 
             while instant.elapsed() < length {
@@ -276,7 +276,7 @@ fn main() {
                 }
                 drone.inner();
                 //mj_step((*SIM).m_, (*SIM).d_);
-                mujoco_Simulate_Sync(SIM, true);
+                mujoco_Simulate_Sync(SIM, false);
                 step += 1;
 
                 let time   = instant.elapsed().as_secs_f64();

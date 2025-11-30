@@ -602,8 +602,9 @@ fn main() {
         // These strings scare me!! sheesh
         // see: https://users.rust-lang.org/t/calling-ffi-c-library-with-c-internal-implementation/39429/10#:~:text=creates%20a%20dangling,You%20should%20do%3A
         //let sim = CString::new("stream").expect("cam id name"); 
-        //let sim = CString::new("stream").expect("cam id name"); 
-        let sim_camera: *const c_char = "stream".as_ptr().cast();
+        let sim = CString::new("stream").expect("cam id name"); 
+        let sim_camera = sim.as_c_str().as_ptr();
+        //let sim_camera: *const c_char = "stream".as_ptr().cast();
         let camid = mujoco_sys::mj_name2id(drone.model, mujoco_sys::mjtObj::mjOBJ_CAMERA as i32, sim_camera);
         if camid == -1 {
             panic!("failed to get simulation camera! bailing!");
